@@ -3,6 +3,7 @@
 #include <random>
 #include <memory>
 #include <chrono>
+#include <thread>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 #include "utils.h"
@@ -12,7 +13,7 @@
 #include "material.h"
 
 double hit_sphere(const point3& center, double radius, const ray& r) {
-    vec3 oc = r.origin() - center; // (A + tB - C).(A + tB - C) = r^2 => B^2t^2 + 2ABt + A^2 - r^2 = 0
+    vec3 oc = r.origin() - center;
     auto a = r.direction().length_squared();
     auto half_b = dot(oc, r.direction());
     auto c = oc.length_squared() - radius*radius;
@@ -24,13 +25,12 @@ double hit_sphere(const point3& center, double radius, const ray& r) {
 color ray_color(const ray& r, const hittable& world, int depth) {
     hit_record rec;
     if (depth <= 0) return color(0,0,0);
-    // if (world.hit(r, 0, infinity, rec)) return 0.5*(rec.normal + color(1,1,1)); // normal gradient if hit
-    if (world.hit(r, 0.001, infinity, rec)) { // diffuse shading if hit, no shadow acne
+    if (world.hit(r, 0.001, infinity, rec)) {
         ray scattered; color attenuation;
         if (rec.mat_ptr->scatter(r, rec, attenuation, scattered)) return attenuation*ray_color(scattered, world, depth-1);
         return color(0,0,0);
     }
-    auto t = 0.5*(unit_vector(r.direction()).y() + 1.0); // vertical gradient if no hit
+    auto t = 0.5*(unit_vector(r.direction()).y() + 1.0);
     return (1.0 - t)*color(1.0, 1.0, 1.0) + t*color(0.5, 0.7, 1.0);
 }
 
@@ -67,15 +67,33 @@ hittable_list random_scene() {
     return world;
 }
 
-constexpr int image_width = 1920, image_height = 1200;
+constexpr int image_width = 1000, image_height = 625;
 constexpr double aspect_ratio = double(image_width)/image_height;
-constexpr int channels = 3, samples_per_pixel = 500, max_depth = 50;
+constexpr int channels = 3, samples_per_pixel = 100, max_depth = 50;
 unsigned char img[image_width*image_height*channels];
+
+void render(int i, int n_threads, const camera& cam, const hittable& world) {
+    for (int j = image_height - 1; j >= 0; --j) {
+        // std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush;
+        for (int k = i; k < image_width; k += n_threads) {
+            color pixel_color(0, 0, 0);
+            for (int s = 0; s < samples_per_pixel; ++s) {
+                auto u = (k + random_double())/(image_width - 1);
+                auto v = ((image_height - 1 - j) + random_double())/(image_height - 1);
+                pixel_color += ray_color(cam.get_ray(u, v), world, max_depth);
+            }
+            for (int c = 0; c < channels; ++c) pixel_color[c] = sqrt(pixel_color[c]/samples_per_pixel);
+            img[(j*image_width + k)*channels + 0] = int(255.999*pixel_color[0]);
+            img[(j*image_width + k)*channels + 1] = int(255.999*pixel_color[1]);
+            img[(j*image_width + k)*channels + 2] = int(255.999*pixel_color[2]);
+        }
+    }
+}
 
 int main() {
     auto start = std::chrono::steady_clock::now();
-// World
     hittable_list world = random_scene();
+    std::cerr << "World generation: " << std::chrono::duration <double, std::milli> (std::chrono::steady_clock::now() - start).count() << " ms" << std::endl;
 // Camera
     point3 lookfrom(13,2,3);
     point3 lookat(0,0,0);
@@ -84,23 +102,13 @@ int main() {
     auto aperture = 0.1;
     camera cam(lookfrom, lookat, vup, 20, aspect_ratio, aperture, dist_to_focus);
 // Render
-    for (int j = image_height - 1; j >= 0; j--) {  // flip to point y up
-        std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush;
-        for (int i = 0; i < image_width; i++) {
-            color pixel_color(0, 0, 0);
-            for (int s = 0; s < samples_per_pixel; ++s) {
-                auto u = (i + random_double())/(image_width - 1);
-                auto v = ((image_height - 1 - j) + random_double())/(image_height - 1); // flip again because of write_png?
-                pixel_color += ray_color(cam.get_ray(u, v), world, max_depth);
-            }
-            for (int c = 0; c < channels; ++c) pixel_color[c] = sqrt(pixel_color[c]/samples_per_pixel); // gamma correction
-            img[(j*image_width + i)*channels + 0] = static_cast<int>(255.999*pixel_color.x());
-            img[(j*image_width + i)*channels + 1] = static_cast<int>(255.999*pixel_color.y());
-            img[(j*image_width + i)*channels + 2] = static_cast<int>(255.999*pixel_color.z());
-        }
-    }
+    int n_threads = std::thread::hardware_concurrency();
+    std::vector<std::thread> threads;
+    for (int i = 0; i < n_threads; i++)
+        threads.push_back(std::thread([&](int i, int n_threads, const camera& cam, const hittable& world) {render(i, n_threads, cam, world);}, i, n_threads, cam, world));
+    for (auto& t : threads) t.join();
+    auto end = std::chrono::steady_clock::now();
+    std::cerr << "Total time: " << std::chrono::duration <double, std::milli> (std::chrono::steady_clock::now() - start).count() << " ms" << std::endl;
     stbi_write_png("image.png", image_width, image_height, channels, img, image_width*channels);
-    std::cerr << "\nDone.\n";
-    auto diff = std::chrono::steady_clock::now() - start;
-    std::cerr << "Time: " << std::chrono::duration <double, std::milli> (diff).count() << " ms";
+    return 0;
 }

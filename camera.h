@@ -15,7 +15,7 @@ struct camera {
             origin = lookfrom;
             horizontal = focus_dist*viewport_width*u; vertical = focus_dist*viewport_height*v;
             lower_left_corner = origin - horizontal/2 - vertical/2 - focus_dist*w;
-            lens_radius = aperture / 2;
+            lens_radius = aperture/2;
         }
         point3 origin, lower_left_corner;
         vec3 horizontal, vertical, u, v, w;
