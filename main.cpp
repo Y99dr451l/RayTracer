@@ -12,28 +12,6 @@
 #include "camera.h"
 #include "material.h"
 
-double hit_sphere(const point3& center, double radius, const ray& r) {
-    vec3 oc = r.origin() - center;
-    auto a = r.direction().length_squared();
-    auto half_b = dot(oc, r.direction());
-    auto c = oc.length_squared() - radius*radius;
-    auto discriminant = half_b*half_b - a*c;
-    if (discriminant < 0) return -1.0;
-    else return (-half_b - sqrt(discriminant))/a;
-}
-
-color ray_color(const ray& r, const hittable& world, int depth) {
-    hit_record rec;
-    if (depth <= 0) return color(0,0,0);
-    if (world.hit(r, 0.001, infinity, rec)) {
-        ray scattered; color attenuation;
-        if (rec.mat_ptr->scatter(r, rec, attenuation, scattered)) return attenuation*ray_color(scattered, world, depth-1);
-        return color(0,0,0);
-    }
-    auto t = 0.5*(unit_vector(r.direction()).y() + 1.0);
-    return (1.0 - t)*color(1.0, 1.0, 1.0) + t*color(0.5, 0.7, 1.0);
-}
-
 hittable_list random_scene() {
     hittable_list world;
     auto ground_material = std::make_shared<lambertian>(color(0.5, 0.5, 0.5));
@@ -49,35 +27,36 @@ hittable_list random_scene() {
                 world.add(std::make_shared<sphere>(center, 0.2, sphere_material));
             }
     }
-    auto material1 = std::make_shared<dielectric>(1.5);
-    world.add(std::make_shared<sphere>(point3(0, 1, 0), 1.0, material1));
-    auto material2 = std::make_shared<lambertian>(color(0.4, 0.2, 0.1));
-    world.add(std::make_shared<sphere>(point3(-4, 1, 0), 1.0, material2));
-    auto material3 = std::make_shared<metal>(color(0.7, 0.6, 0.5), 0.0);
-    world.add(std::make_shared<sphere>(point3(4, 1, 0), 1.0, material3));
+    world.add(std::make_shared<sphere>(point3(0, 1, 0), 1.0, std::make_shared<dielectric>(1.5)));
+    world.add(std::make_shared<sphere>(point3(-4, 1, 0), 1.0, std::make_shared<lambertian>(color(0.4, 0.2, 0.1))));
+    world.add(std::make_shared<sphere>(point3(4, 1, 0), 1.0, std::make_shared<metal>(color(0.7, 0.6, 0.5), 0.0)));
     return world;
 }
 
-constexpr int image_width = 1000, image_height = 625;
+color ray_color(const ray& r, const hittable& world, int depth) {
+    hit_record rec;
+    if (depth <= 0) return color(0,0,0);
+    if (world.hit(r, 0.001, infinity, rec)) {
+        ray scattered; color attenuation;
+        if (rec.mat_ptr->scatter(r, rec, attenuation, scattered)) return attenuation*ray_color(scattered, world, depth-1);
+        return color(0,0,0);
+    }
+    auto t = 0.5*(unit_vector(r.direction()).y() + 1.0);
+    return (1.0 - t)*color(1.0, 1.0, 1.0) + t*color(0.5, 0.7, 1.0);
+}
+
+constexpr int image_width = 1000, image_height = 625, channels = 3, samples_per_pixel = 100, max_depth = 50;
 constexpr double aspect_ratio = double(image_width)/image_height;
-constexpr int channels = 3, samples_per_pixel = 100, max_depth = 50;
 unsigned char img[image_width*image_height*channels];
 
 void render(int i, int n_threads, const camera& cam, const hittable& world) {
-    for (int j = image_height - 1; j >= 0; --j) {
-        // std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush;
-        for (int k = i; k < image_width; k += n_threads) {
+    for (int j = image_height - 1; j >= 0; --j) for (int k = i; k < image_width; k += n_threads) {
             color pixel_color(0, 0, 0);
             for (int s = 0; s < samples_per_pixel; ++s) {
-                auto u = (k + random_double())/(image_width - 1);
-                auto v = ((image_height - 1 - j) + random_double())/(image_height - 1);
+                auto u = (k + random_double())/(image_width - 1), v = (image_height - 1 - j + random_double())/(image_height - 1);
                 pixel_color += ray_color(cam.get_ray(u, v), world, max_depth);
             }
-            for (int c = 0; c < channels; ++c) pixel_color[c] = sqrt(pixel_color[c]/samples_per_pixel);
-            img[(j*image_width + k)*channels + 0] = int(255.999*pixel_color[0]);
-            img[(j*image_width + k)*channels + 1] = int(255.999*pixel_color[1]);
-            img[(j*image_width + k)*channels + 2] = int(255.999*pixel_color[2]);
-        }
+            for (int c = 0; c < channels; ++c) img[(j*image_width + k)*channels + c] = int(255.999*sqrt(pixel_color[c]/samples_per_pixel));
     }
 }
 
@@ -86,11 +65,9 @@ int main() {
     hittable_list world = random_scene();
     std::cerr << "World generation: " << std::chrono::duration <double, std::milli> (std::chrono::steady_clock::now() - start).count() << " ms" << std::endl;
 // Camera
-    point3 lookfrom(13,2,10);
-    point3 lookat(0,0,0);
+    point3 lookfrom(13,2,10), lookat(0,0,0);
     vec3 vup(0,1,0);
-    auto dist_to_focus = 15.0;
-    auto aperture = 0.1;
+    auto dist_to_focus = 15.0, aperture = 0.1;
     camera cam(lookfrom, lookat, vup, 20, aspect_ratio, aperture, dist_to_focus);
 // Render
     int n_threads = std::thread::hardware_concurrency();
