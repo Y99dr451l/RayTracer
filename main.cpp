@@ -16,19 +16,21 @@
 #include "texture.h"
 #include "scenes.h"
 
-color ray_color(const ray& r, const color& background, const hittable& world, int depth) {
-    hit_record rec;
-    if (depth <= 0) return color(0,0,0);
-    if (!world.hit(r, 0.001, infinity, rec)) return background;
-    ray scattered;
-    color attenuation, color, emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
-    if (!rec.mat_ptr->scatter(r, rec, attenuation, scattered)) return emitted;
-    return emitted + attenuation * ray_color(scattered, background, world, depth-1);
-}
-
-constexpr int image_width = 1000, image_height = 1000, channels = 3, samples_per_pixel = 2000, max_depth = 50;
+constexpr int image_width = 1000, image_height = 1000, channels = 3, samples_per_pixel = 1000, max_depth = 50;
 constexpr double aspect_ratio = double(image_width)/image_height;
 unsigned char img[image_width*image_height*channels];
+bool invisible_sources = true;
+
+color ray_color(const ray& r, const color& background, const hittable& world, int depth) {
+    hit_record rec;
+    if (depth <= 0) return color(0);
+    if (!world.hit(r, 0.001, infinity, rec)) return background;
+    ray scattered;
+    color attenuation;
+    color emitted = (depth == max_depth && invisible_sources) ? color(0) : rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
+    if (!rec.mat_ptr->scatter(r, rec, attenuation, scattered)) return emitted;
+    return emitted + attenuation*ray_color(scattered, background, world, depth - 1);
+}
 
 void render(int i, int n_threads, const camera& cam, const color& background, const hittable& world) {
     for (int j = image_height - 1; j >= 0; --j) for (int k = i; k < image_width; k += n_threads) {
@@ -48,7 +50,7 @@ int main() {
     auto vfov = 40.0, aperture = 0.0;
     hittable_list objects; camera cam;
     cam = camera(lookfrom, lookat, vec3(0,1,0), vfov, aspect_ratio, aperture, (lookfrom-lookat).length(), 0.0, 1.0);
-    final_scene(objects, cam, background, aspect_ratio);    
+    simple_light(objects, cam, background, aspect_ratio);    
     std::cerr << "World generation: " << std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() << " ms" << std::endl;
 // Render
     int n_threads = std::thread::hardware_concurrency();

@@ -89,8 +89,8 @@ void simple_light(hittable_list &objects, camera &cam, color& background, double
     auto pertext = std::make_shared<noise_texture>(4);
     objects.add(std::make_shared<sphere>(point3(0,-1000,0), 1000, std::make_shared<lambertian>(pertext)));
     objects.add(std::make_shared<sphere>(point3(0,2,0), 2, std::make_shared<lambertian>(pertext)));
-    objects.add(std::make_shared<xy_rect>(3, 5, 1, 3, -2, std::make_shared<diffuse_light>(color(4))));
-    // objects.add(std::make_shared<xy_rect>(2.5, 5.5, 0.5, 3.5, -1.9, std::make_shared<dielectric>(1.5)));
+    // objects.add(std::make_shared<xy_rect>(3, 5, 1, 3, -2, std::make_shared<diffuse_light>(color(4))));
+    objects.add(std::make_shared<sphere>(point3(4,3,-2), 0.3, std::make_shared<diffuse_light>(color(10))));
 }
 
 void cornell_box(hittable_list &objects, camera &cam, color& background, double aspect_ratio) {

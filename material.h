@@ -60,9 +60,9 @@ struct dielectric : public material {
 struct diffuse_light : public material  {
     diffuse_light(std::shared_ptr<texture> a) : emit(a) {}
     diffuse_light(color c) : emit(std::make_shared<solid_color>(c)) {}
+    std::shared_ptr<texture> emit;
     virtual bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered) const override {return false;}
     virtual color emitted(double u, double v, const point3& p) const override {return emit->value(u, v, p);}
-    std::shared_ptr<texture> emit;
 };
 
 struct isotropic : public material {
