@@ -1,2 +1,4 @@
 # RayTracer
-Simple raytracing algorithm following the "[Ray Tracing in One Weekend](https://raytracing.github.io)" series by Peter Shirley, with addition of the suggested [stb_image_write.h](https://github.com/nothings/stb) library by Sean Barrett.
+Raytracer following the "[Ray Tracing in One Weekend](https://raytracing.github.io)" series by Peter Shirley, adding:
+- jpg/png output using [stb_image_write.h](https://github.com/nothings/stb)
+- multithreading
