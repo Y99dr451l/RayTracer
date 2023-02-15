@@ -93,7 +93,7 @@ void simple_light(hittable_list &objects, camera &cam, color& background, double
     objects.add(std::make_shared<sphere>(point3(4,3,-2), 0.3, std::make_shared<diffuse_light>(color(10))));
 }
 
-void cornell_box(hittable_list &objects, camera &cam, color& background, double aspect_ratio) {
+hittable_list cornell_box(hittable_list &objects, camera &cam, color& background, double aspect_ratio) {
     background = color(0,0,0);
     auto lookfrom = point3(278, 278, -800), lookat = point3(278, 278, 0);
     auto vfov = 40.0, aperture = 0.0;
@@ -104,21 +104,27 @@ void cornell_box(hittable_list &objects, camera &cam, color& background, double 
     auto light = std::make_shared<diffuse_light>(color(15));
     objects.add(std::make_shared<yz_rect>(0, 555, 0, 555, 555, green));
     objects.add(std::make_shared<yz_rect>(0, 555, 0, 555, 0, red));
-    objects.add(std::make_shared<xz_rect>(213, 343, 227, 332, 554, light));
+    objects.add(std::make_shared<flip_face>(std::make_shared<xz_rect>(213, 343, 227, 332, 554, light)));
     objects.add(std::make_shared<xz_rect>(0, 555, 0, 555, 0, white));
     objects.add(std::make_shared<xz_rect>(0, 555, 0, 555, 555, white));
     objects.add(std::make_shared<xy_rect>(0, 555, 0, 555, 555, white));
-    std::shared_ptr<hittable> box1 = std::make_shared<box>(point3(0,0,0), point3(165,330,165), white);
+    std::shared_ptr<material> aluminium = std::make_shared<metal>(color(0.8, 0.85, 0.88), 0.0);
+    std::shared_ptr<hittable> box1 = std::make_shared<box>(point3(0, 0, 0), point3(165, 330, 165), aluminium);
     box1 = std::make_shared<rotate_y>(box1, 15);
     box1 = std::make_shared<translate>(box1, vec3(265,0,295));
     objects.add(box1);
-    std::shared_ptr<hittable> box2 = std::make_shared<box>(point3(0,0,0), point3(165,165,165), white);
-    box2 = std::make_shared<rotate_y>(box2, -18);
-    box2 = std::make_shared<translate>(box2, vec3(130,0,65));
-    objects.add(box2);
+    //std::shared_ptr<hittable> box2 = std::make_shared<box>(point3(0,0,0), point3(165,165,165), white);
+    //box2 = std::make_shared<rotate_y>(box2, -18);
+    //box2 = std::make_shared<translate>(box2, vec3(130,0,65));
+    //objects.add(box2);
+    auto glass = std::make_shared<dielectric>(1.5);
+    objects.add(std::make_shared<sphere>(point3(190, 90, 190), 90, glass));
+    hittable_list lights;
+    lights.add(std::make_shared<xz_rect>(213, 343, 227, 332, 554, std::shared_ptr<material>()));
+    return lights;
 }
 
-void cornell_smoke(hittable_list &objects, camera &cam, color& background, double aspect_ratio) {
+hittable_list cornell_smoke(hittable_list &objects, camera &cam, color& background, double aspect_ratio) {
     background = color(0,0,0);
     auto lookfrom = point3(278, 278, -800), lookat = point3(278, 278, 0);
     auto vfov = 40.0, aperture = 0.0;
@@ -127,6 +133,8 @@ void cornell_smoke(hittable_list &objects, camera &cam, color& background, doubl
     auto white = std::make_shared<lambertian>(color(.73, .73, .73));
     auto green = std::make_shared<lambertian>(color(.12, .45, .15));
     auto light = std::make_shared<diffuse_light>(color(7));
+    //objects.add(std::make_shared<flip_face>(std::make_shared<xz_rect>(113, 443, 127, 432, 554, light)));
+    objects.add(std::make_shared<xz_rect>(113, 443, 127, 432, 554, light));
     objects.add(std::make_shared<yz_rect>(0, 555, 0, 555, 555, green));
     objects.add(std::make_shared<yz_rect>(0, 555, 0, 555, 0, red));
     objects.add(std::make_shared<xz_rect>(113, 443, 127, 432, 554, light));
@@ -141,9 +149,12 @@ void cornell_smoke(hittable_list &objects, camera &cam, color& background, doubl
     box2 = std::make_shared<translate>(box2, vec3(130,0,65));
     objects.add(std::make_shared<constant_medium>(box1, 0.01, color(0,0,0)));
     objects.add(std::make_shared<constant_medium>(box2, 0.01, color(1,1,1)));
+    hittable_list lights;
+    lights.add(std::make_shared<xz_rect>(113, 443, 127, 432, 554, std::shared_ptr<material>()));
+    return lights;
 }
 
-void final_scene(hittable_list &objects, camera& cam, color& background, double aspect_ratio) {
+hittable_list final_scene(hittable_list &objects, camera& cam, color& background, double aspect_ratio) {
     background = color(0,0,0);
     auto lookfrom = point3(478, 278, -600), lookat = point3(278, 278, 0);
     auto vfov = 40.0, aperture = 0.0;
@@ -178,6 +189,12 @@ void final_scene(hittable_list &objects, camera& cam, color& background, double 
     int ns = 1000;
     for (int j = 0; j < ns; j++) boxes2.add(std::make_shared<sphere>(point3::random(0,165), 10, white));
     objects.add(std::make_shared<translate>(std::make_shared<rotate_y>(std::make_shared<bvh_node>(boxes2, 0.0, 1.0), 15),vec3(-100,270,395)));
+    hittable_list lights;
+    lights.add(std::make_shared<xz_rect>(123, 423, 147, 412, 554, std::shared_ptr<material>()));
+    lights.add(std::make_shared<sphere>(point3(260, 150, 45), 50, std::shared_ptr<material>()));
+    lights.add(std::make_shared<sphere>(point3(360, 150, 145), 70, std::shared_ptr<material>()));
+    lights.add(std::make_shared<sphere>(point3(0, 0, 0), 5000, std::shared_ptr<material>()));
+    return lights;
 }
 
 #endif

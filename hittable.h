@@ -4,20 +4,30 @@
 #include <vector>
 #include "ray.h"
 #include "vec3.h"
-#include "material.h"
-#include "hit_record.h"
+//#include "hit_record.h"
 #include "aabb.h"
 
 struct material;
 
+struct hit_record {
+    point3 p; vec3 normal;
+    double t, u, v; bool front_face;
+    std::shared_ptr<material> mat_ptr;
+    inline void set_face_normal(const ray& r, const vec3& outward_normal) {
+        front_face = dot(r.direction(), outward_normal) < 0;
+        normal = (dot(r.direction(), outward_normal) < 0) ? outward_normal : -outward_normal;
+    }
+};
+
 struct hittable {
     virtual bool hit(const ray& r, double t_min, double t_max, hit_record& rec) const = 0;
     virtual bool bounding_box(double time0, double time1, aabb& output_box) const = 0;
+    virtual double pdf_value(const point3& o, const vec3& v) const {return 0.0;}
+    virtual vec3 random(const vec3& o) const {return vec3(1, 0, 0);}
 };
 
 struct translate : public hittable {
-    translate(std::shared_ptr<hittable> p, const vec3& displacement)
-    : ptr(p), offset(displacement) {}
+    translate(std::shared_ptr<hittable> p, const vec3& displacement) : ptr(p), offset(displacement) {}
     std::shared_ptr<hittable> ptr;
     vec3 offset;
     virtual bool hit(const ray& r, double t_min, double t_max, hit_record& rec) const override {
@@ -40,14 +50,15 @@ struct rotate_y : public hittable {
         hasbox = ptr->bounding_box(0, 1, bbox);
         point3 min( infinity,  infinity,  infinity), max(-infinity, -infinity, -infinity);
         for (int i = 0; i < 2; i++) for (int j = 0; j < 2; j++) for (int k = 0; k < 2; k++) {
-            auto x = i*bbox.max().x() + (1-i)*bbox.min().x();
-            auto y = j*bbox.max().y() + (1-j)*bbox.min().y();
-            auto z = k*bbox.max().z() + (1-k)*bbox.min().z();
+            auto x = i*bbox.max().x() + (1 - i)*bbox.min().x();
+            auto y = j*bbox.max().y() + (1 - j)*bbox.min().y();
+            auto z = k*bbox.max().z() + (1 - k)*bbox.min().z();
             auto newx =  cos_theta*x + sin_theta*z;
             auto newz = -sin_theta*x + cos_theta*z;
             vec3 tester(newx, y, newz);
             for (int c = 0; c < 3; c++) {
-                min[c] = fmin(min[c], tester[c]); max[c] = fmax(max[c], tester[c]);
+                min[c] = fmin(min[c], tester[c]);
+                max[c] = fmax(max[c], tester[c]);
             }
         }
         bbox = aabb(min, max);
@@ -75,6 +86,17 @@ struct rotate_y : public hittable {
         output_box = bbox;
         return hasbox;
     }
+};
+
+struct flip_face : public hittable {
+    flip_face(std::shared_ptr<hittable> p) : ptr(p) {}
+    std::shared_ptr<hittable> ptr;
+    virtual bool hit(const ray& r, double t_min, double t_max, hit_record& rec) const override {
+        if (!ptr->hit(r, t_min, t_max, rec)) return false;
+        rec.front_face = !rec.front_face;
+        return true;
+    }
+    virtual bool bounding_box(double time0, double time1, aabb& output_box) const override {return ptr->bounding_box(time0, time1, output_box);}
 };
 
 #endif

@@ -42,6 +42,19 @@ vec3 random_in_unit_sphere() {while (true) {auto p = vec3::random(-1,1); if (p.l
 vec3 random_unit_vector() {return unit_vector(random_in_unit_sphere());}
 vec3 random_in_hemisphere(const vec3& normal) {vec3 vec = random_in_unit_sphere(); if (dot(vec, normal) > 0.0) return vec; else return -vec;}
 vec3 random_in_unit_disk() {while (true) {auto p = vec3(random_double(-1,1), random_double(-1,1), 0); if (p.length_squared() < 1) return p;}}
+inline vec3 random_cosine_direction() {
+    auto r1 = random_double(), r2 = random_double();
+    auto z = sqrt(1 - r2), phi = 2 * Pi * r1, sqrtr2 = sqrt(r2);
+    auto x = cos(phi)*sqrtr2, y = sin(phi)*sqrtr2;
+    return vec3(x, y, z);
+}
+inline vec3 random_to_sphere(double radius, double distance_squared) {
+    auto r1 = random_double(), r2 = random_double();
+    auto z = 1 + r2*(sqrt(1 - radius*radius/distance_squared) - 1);
+    auto phi = 2*Pi*r1;
+    auto x = cos(phi)*sqrt(1 - z*z), y = sin(phi)*sqrt(1 - z*z);
+    return vec3(x, y, z);
+}
 // optics stuff
 vec3 reflect(const vec3& v, const vec3& n) {return v - 2*dot(v,n)*n;}
 vec3 refract(const vec3& uv, const vec3& n, double etai_over_etat) {
