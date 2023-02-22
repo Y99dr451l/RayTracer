@@ -9,8 +9,8 @@
 // along with this software. If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.
 //==============================================================================================
 
+#include <chrono>
 #include "rtweekend.h"
-
 #include "camera.h"
 #include "color.h"
 #include "constant_medium.h"
@@ -71,7 +71,10 @@ void cornell_box(scene& scene_desc) {
 }
 
 int main() {
+    auto start = std::chrono::steady_clock::now();
     scene scene_desc;
     cornell_box(scene_desc);
+    std::cout << "World generation: " << std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() << " ms" << std::endl;
     scene_desc.render();
+    std::cout << "Total time: " << std::chrono::duration <double, std::milli>(std::chrono::steady_clock::now() - start).count() << " ms" << std::endl;
 }
